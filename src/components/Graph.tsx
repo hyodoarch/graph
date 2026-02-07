@@ -224,6 +224,7 @@ const graphScript = `
 
     async function renderGraph(graph, fullSlug) {
       var slug = simplifySlug(fullSlug);
+      if (slug === "") slug = "index";
       var visited = getVisited();
       removeAllChildren(graph);
 
