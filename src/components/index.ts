@@ -1,1 +1,2 @@
-export { ExampleComponent, type ExampleComponentOptions } from "./ExampleComponent";
+export { Graph } from "./Graph";
+export type { GraphOptions, D3Config } from "./Graph";

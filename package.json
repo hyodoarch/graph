@@ -1,23 +1,23 @@
 {
-  "name": "@quartz-community/plugin-template",
+  "name": "@quartz-community/graph",
   "version": "0.1.0",
-  "description": "Template repository for Quartz community plugins.",
+  "description": "Interactive graph visualization component for Quartz - visualize your content as a network graph.",
   "type": "module",
   "license": "MIT",
   "author": "Quartz Community",
   "homepage": "https://quartz.jzhao.xyz",
   "repository": {
     "type": "git",
-    "url": "https://github.com/quartz-community/plugin-template"
+    "url": "https://github.com/quartz-community/graph"
   },
   "keywords": [
     "quartz",
     "quartz-plugin",
-    "plugin-template",
-    "remark",
-    "rehype",
-    "mdast",
-    "hast"
+    "graph",
+    "visualization",
+    "network",
+    "d3",
+    "pixi"
   ],
   "files": [
     "dist",

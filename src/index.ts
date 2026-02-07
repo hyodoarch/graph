@@ -1,11 +1,3 @@
-export { ExampleTransformer } from "./transformer";
-export { ExampleFilter } from "./filter";
-export { ExampleEmitter } from "./emitter";
-export { ExampleComponent } from "./components/ExampleComponent";
-
-export type {
-  ExampleTransformerOptions,
-  ExampleFilterOptions,
-  ExampleEmitterOptions,
-  ExampleComponentOptions,
-} from "./types";
+export { Graph } from "./components/Graph";
+export type { GraphOptions, D3Config } from "./components/Graph";
+export { manifest } from "./manifest";
