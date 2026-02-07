@@ -265,7 +265,7 @@ const graphScript = `
       data.forEach(function(details, source) {
         var outgoing = details.links || [];
         for (var i = 0; i < outgoing.length; i++) {
-          var dest = outgoing[i];
+          var dest = simplifySlug(outgoing[i]);
           if (validLinks.has(dest)) {
             links.push({ source: source, target: dest });
           }
