@@ -1,4 +1,11 @@
 // @ts-nocheck
+import {
+  removeAllChildren,
+  getFullSlugFromUrl,
+  simplifySlug,
+  resolvePath,
+} from "@quartz-community/utils";
+
 (function () {
   function loadScript(src) {
     return new Promise(function (resolve, reject) {
@@ -40,30 +47,6 @@
       var visited = getVisited();
       visited.add(slug);
       localStorage.setItem(localStorageKey, JSON.stringify(Array.from(visited)));
-    }
-
-    function removeAllChildren(element) {
-      while (element.firstChild) {
-        element.removeChild(element.firstChild);
-      }
-    }
-
-    function getFullSlug() {
-      var url = window.location.pathname;
-      var rawSlug = url;
-      if (rawSlug.endsWith("/")) rawSlug = rawSlug.slice(0, -1);
-      if (rawSlug.startsWith("/")) rawSlug = rawSlug.slice(1);
-      return rawSlug;
-    }
-
-    function simplifySlug(slug) {
-      if (slug.endsWith("/index")) return slug.slice(0, -6);
-      return slug;
-    }
-
-    function resolvePath(to) {
-      if (to.startsWith("/")) return to;
-      return "/" + to;
     }
 
     async function renderGraph(graph, fullSlug) {
@@ -288,16 +271,12 @@
           hoveredNeighbours = new Set();
           for (var i = 0; i < nodeRenderData.length; i++) {
             nodeRenderData[i].active = false;
-            nodeRenderData[i].gfx.alpha = 1;
-            nodeRenderData[i].label.alpha = 0;
           }
           for (var i = 0; i < linkRenderData.length; i++) {
             linkRenderData[i].active = false;
-            linkRenderData[i].gfx.alpha = 1;
           }
         } else {
           hoveredNeighbours = new Set();
-          hoveredNeighbours.add(newHoveredId);
 
           for (var i = 0; i < linkRenderData.length; i++) {
             var linkData = linkRenderData[i].simulationData;
@@ -305,27 +284,65 @@
               hoveredNeighbours.add(linkData.source.id);
               hoveredNeighbours.add(linkData.target.id);
               linkRenderData[i].active = true;
-              linkRenderData[i].gfx.alpha = 1;
             } else {
               linkRenderData[i].active = false;
-              linkRenderData[i].gfx.alpha = 0.2;
             }
           }
+
+          hoveredNeighbours.add(newHoveredId);
 
           for (var i = 0; i < nodeRenderData.length; i++) {
             if (hoveredNeighbours.has(nodeRenderData[i].simulationData.id)) {
               nodeRenderData[i].active = true;
-              nodeRenderData[i].gfx.alpha = 1;
-              nodeRenderData[i].label.alpha = 1;
             } else {
               nodeRenderData[i].active = false;
-              if (focusOnHover) {
-                nodeRenderData[i].gfx.alpha = 0.2;
-                nodeRenderData[i].label.alpha = 0;
-              }
             }
           }
         }
+      }
+
+      function renderLinks() {
+        for (var i = 0; i < linkRenderData.length; i++) {
+          var linkData = linkRenderData[i];
+          var alpha = 1;
+          if (hoveredNodeId !== null) {
+            alpha = linkData.active ? 1 : 0.2;
+          }
+          linkData.alpha = alpha;
+          linkData.color = linkData.active ? gray : lightgray;
+        }
+      }
+
+      function renderLabels() {
+        var defaultScale = 1 / scale;
+        var activeScale = defaultScale * 1.1;
+
+        for (var i = 0; i < nodeRenderData.length; i++) {
+          var nodeData = nodeRenderData[i];
+          if (hoveredNodeId === nodeData.simulationData.id) {
+            nodeData.label.alpha = 1;
+            nodeData.label.scale.set(activeScale);
+          } else {
+            nodeData.label.scale.set(defaultScale);
+          }
+        }
+      }
+
+      function renderNodes() {
+        for (var i = 0; i < nodeRenderData.length; i++) {
+          var nodeData = nodeRenderData[i];
+          var alpha = 1;
+          if (hoveredNodeId !== null && focusOnHover) {
+            alpha = nodeData.active ? 1 : 0.2;
+          }
+          nodeData.gfx.alpha = alpha;
+        }
+      }
+
+      function renderPixiFromD3() {
+        renderNodes();
+        renderLinks();
+        renderLabels();
       }
 
       for (var i = 0; i < nodes.length; i++) {
@@ -360,15 +377,24 @@
         gfx.cursor = "pointer";
         gfx.label = nodeId;
 
-        (function (n, g) {
+        (function (n, g, labelRef) {
+          var oldLabelOpacity = 0;
           g.on("pointerover", function (e) {
             updateHoverInfo(n.id);
+            oldLabelOpacity = labelRef.alpha;
+            if (!dragging) {
+              renderPixiFromD3();
+            }
           });
 
           g.on("pointerleave", function () {
             updateHoverInfo(null);
+            labelRef.alpha = oldLabelOpacity;
+            if (!dragging) {
+              renderPixiFromD3();
+            }
           });
-        })(node, gfx);
+        })(node, gfx, label);
 
         nodesContainer.addChild(gfx);
 
@@ -442,7 +468,8 @@
           event.subject.fx = null;
           event.subject.fy = null;
           dragging = false;
-          hoveredNodeId = null;
+          updateHoverInfo(null);
+          renderPixiFromD3();
 
           if (Date.now() - dragStartTime < 500) {
             var target = resolvePath(event.subject.id);
@@ -479,16 +506,16 @@
           var newScale = currentTransform.k * opacityScale;
           var scaleOpacity = Math.max((newScale - 1) / 3.75, 0);
 
+          var activeLabels = [];
+          for (var i = 0; i < nodeRenderData.length; i++) {
+            if (nodeRenderData[i].active) {
+              activeLabels.push(nodeRenderData[i].label);
+            }
+          }
+
           for (var i = 0; i < labelsContainer.children.length; i++) {
             var label = labelsContainer.children[i];
-            var isActive = false;
-            for (var j = 0; j < nodeRenderData.length; j++) {
-              if (nodeRenderData[j].active && nodeRenderData[j].label === label) {
-                isActive = true;
-                break;
-              }
-            }
-            if (!isActive) {
+            if (activeLabels.indexOf(label) === -1) {
               label.alpha = scaleOpacity;
             }
           }
@@ -542,6 +569,7 @@
 
       simulation.on("tick", function () {});
       simulation.restart();
+      renderPixiFromD3();
       animate();
 
       return function () {
@@ -569,6 +597,10 @@
     }
 
     var globalContainers = [];
+    var globalIcons = [];
+    var documentClickHandler = null;
+    var documentKeydownHandler = null;
+    var iconClickHandler = null;
 
     function hideGlobalGraph() {
       cleanupGlobal();
@@ -581,9 +613,52 @@
       }
     }
 
+    function anyGlobalGraphActive() {
+      for (var i = 0; i < globalContainers.length; i++) {
+        if (globalContainers[i].classList.contains("active")) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function showGlobalGraph() {
+      cleanupGlobal();
+      var currentSlug = getFullSlugFromUrl();
+      for (var i = 0; i < globalContainers.length; i++) {
+        var container = globalContainers[i];
+        container.classList.add("active");
+        var sidebar = container.closest(".sidebar");
+        if (sidebar) {
+          sidebar.style.zIndex = "1";
+        }
+
+        var graphContainer = container.querySelector(".global-graph-container");
+        if (graphContainer) {
+          (function (gc) {
+            renderGraph(gc, currentSlug)
+              .then(function (cleanup) {
+                globalCleanups.push(cleanup);
+              })
+              .catch(function (err) {
+                console.error("[Graph] Global render error:", err);
+              });
+          })(graphContainer);
+        }
+      }
+    }
+
+    function toggleGlobalGraph() {
+      if (anyGlobalGraphActive()) {
+        hideGlobalGraph();
+      } else {
+        showGlobalGraph();
+      }
+    }
+
     function renderLocal() {
       cleanupLocal();
-      var slug = getFullSlug();
+      var slug = getFullSlugFromUrl();
       addToVisited(slug);
 
       var localContainers = document.querySelectorAll(".graph-container");
@@ -601,99 +676,70 @@
     }
 
     function handleNav(e) {
-      var slug = e.detail ? e.detail.url : getFullSlug();
+      var slug = e.detail ? e.detail.url : getFullSlugFromUrl();
       addToVisited(simplifySlug(slug));
 
       renderLocal();
 
       globalContainers = Array.from(document.querySelectorAll(".global-graph-outer"));
 
-      function showGlobal() {
-        cleanupGlobal();
-        var currentSlug = getFullSlug();
-        for (var i = 0; i < globalContainers.length; i++) {
-          var container = globalContainers[i];
-          container.classList.add("active");
-          var sidebar = container.closest(".sidebar");
-          if (sidebar) {
-            sidebar.style.zIndex = "1";
-          }
-
-          var graphContainer = container.querySelector(".global-graph-container");
-          if (graphContainer) {
-            (function (gc) {
-              renderGraph(gc, currentSlug)
-                .then(function (cleanup) {
-                  globalCleanups.push(cleanup);
-                })
-                .catch(function (err) {
-                  console.error("[Graph] Global render error:", err);
-                });
-            })(graphContainer);
-          }
+      if (iconClickHandler) {
+        for (var i = 0; i < globalIcons.length; i++) {
+          globalIcons[i].removeEventListener("click", iconClickHandler);
         }
       }
 
-      var icons = document.querySelectorAll(".global-graph-icon");
-      for (var i = 0; i < icons.length; i++) {
-        icons[i].addEventListener("click", function () {
-          var isActive = false;
-          for (var j = 0; j < globalContainers.length; j++) {
-            if (globalContainers[j].classList.contains("active")) {
-              isActive = true;
-              break;
-            }
-          }
-          if (isActive) {
-            hideGlobalGraph();
-          } else {
-            showGlobal();
-          }
-        });
+      globalIcons = Array.from(document.querySelectorAll(".global-graph-icon"));
+      iconClickHandler = function () {
+        toggleGlobalGraph();
+      };
+      for (var i = 0; i < globalIcons.length; i++) {
+        globalIcons[i].addEventListener("click", iconClickHandler);
       }
 
-      document.addEventListener("click", function (e) {
-        var isActive = false;
-        for (var i = 0; i < globalContainers.length; i++) {
-          if (globalContainers[i].classList.contains("active")) {
-            isActive = true;
-            break;
-          }
-        }
-        if (isActive) {
+      if (documentClickHandler) {
+        document.removeEventListener("click", documentClickHandler);
+      }
+      documentClickHandler = function (e) {
+        if (anyGlobalGraphActive()) {
           var inContainer = e.target.closest(".global-graph-container");
           var inIcon = e.target.closest(".global-graph-icon");
           if (!inContainer && !inIcon) {
             hideGlobalGraph();
           }
         }
-      });
+      };
+      document.addEventListener("click", documentClickHandler);
 
-      document.addEventListener("keydown", function (e) {
+      if (documentKeydownHandler) {
+        document.removeEventListener("keydown", documentKeydownHandler);
+      }
+      documentKeydownHandler = function (e) {
+        if (e.key === "Escape") {
+          if (anyGlobalGraphActive()) {
+            hideGlobalGraph();
+          }
+          return;
+        }
+
         if (e.key === "g" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
           e.preventDefault();
-          var isActive = false;
-          for (var i = 0; i < globalContainers.length; i++) {
-            if (globalContainers[i].classList.contains("active")) {
-              isActive = true;
-              break;
-            }
-          }
-          if (isActive) {
-            hideGlobalGraph();
-          } else {
-            showGlobal();
-          }
+          toggleGlobalGraph();
         }
-      });
+      };
+      document.addEventListener("keydown", documentKeydownHandler);
+
+      if (anyGlobalGraphActive()) {
+        showGlobalGraph();
+      }
     }
 
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", function () {
-        handleNav({ detail: { url: getFullSlug() } });
+        handleNav({ detail: { url: getFullSlugFromUrl() } });
       });
     } else {
-      handleNav({ detail: { url: getFullSlug() } });
+      handleNav({ detail: { url: getFullSlugFromUrl() } });
     }
     document.addEventListener("nav", handleNav);
   }
