@@ -2,8 +2,6 @@
 
 The Graph View component for Quartz - visualize your digital garden as an interactive network graph.
 
-This is a first-party community plugin for Quartz, demonstrating the new plugin system that allows components to be distributed as npm packages. It displays your content as an interactive force-directed graph, with both local (page-specific) and global (full site) views.
-
 ## Features
 
 - 🕸️ **Interactive Network Graph** - Visualize connections between your pages
@@ -16,49 +14,27 @@ This is a first-party community plugin for Quartz, demonstrating the new plugin 
 
 ## Installation
 
-### From GitHub (Recommended for now)
-
 ```bash
-npm install github:quartz-community/graph --legacy-peer-deps
-```
-
-### From NPM (when published)
-
-```bash
-npm install @quartz-community/graph
+npx quartz plugin add github:quartz-community/graph
 ```
 
 ## Usage
 
-### 1. Configure in quartz.config.ts
-
-Add the plugin to your externalPlugins array:
-
-```typescript
-// quartz.config.ts
-import { QuartzConfig } from "./quartz/cfg";
-
-const config: QuartzConfig = {
-  configuration: {
-    // ... your configuration
-  },
-  plugins: {
-    // ... your existing plugins
-  },
-  externalPlugins: ["@quartz-community/graph"],
-};
-
-export default config;
+```yaml title="quartz.config.yaml"
+plugins:
+  - source: github:quartz-community/graph
+    enabled: true
+    layout:
+      position: right
+      priority: 10
 ```
 
-### 2. Import in your layout
+For advanced use cases, you can override in TypeScript:
 
-```typescript
-// quartz.layout.ts
-import { Graph } from "@quartz-community/graph";
+```ts title="quartz.ts (override)"
+import * as ExternalPlugin from "./.quartz/plugins";
 
-// Create the Graph component once and reuse it across layouts
-const graphComponent = Graph({
+ExternalPlugin.Graph({
   localGraph: {
     drag: true,
     zoom: true,
@@ -70,22 +46,6 @@ const graphComponent = Graph({
     depth: -1,
   },
 });
-
-export const defaultContentPageLayout: PageLayout = {
-  // ... other layout config
-  right: [
-    // ... other components
-    graphComponent,
-  ],
-};
-
-export const defaultListPageLayout: PageLayout = {
-  // ... other layout config
-  right: [
-    // ... other components
-    graphComponent, // Reuse the same component instance
-  ],
-};
 ```
 
 ## Configuration Options
@@ -177,6 +137,10 @@ npm run build
 ```
 
 The `prepare` script automatically builds during installation.
+
+## Documentation
+
+See the [Quartz documentation](https://quartz.jzhao.xyz/features/graph%20view) for more information.
 
 ## License
 
