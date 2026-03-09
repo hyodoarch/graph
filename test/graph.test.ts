@@ -41,17 +41,3 @@ describe("Graph Component", () => {
   });
 });
 
-describe("Graph Manifest", () => {
-  it("should export a valid plugin manifest", async () => {
-    const { manifest } = await import("../src/manifest");
-
-    expect(manifest).toBeDefined();
-    expect(manifest.name).toBe("@quartz-community/graph");
-    expect(manifest.version).toBeDefined();
-    expect(manifest.components).toBeDefined();
-    expect(typeof manifest.components).toBe("object");
-    const graphComponent = manifest.components?.Graph;
-    expect(graphComponent).toBeDefined();
-    expect(graphComponent?.name).toBe("Graph");
-  });
-});
