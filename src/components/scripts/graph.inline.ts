@@ -77,8 +77,7 @@ import {
 
       var data;
       try {
-        var response = await fetch("/static/contentIndex.json");
-        var dataRaw = await response.json();
+        var dataRaw = await fetchData;
         data = new Map();
         for (var key in dataRaw) {
           data.set(simplifySlug(key), dataRaw[key]);
