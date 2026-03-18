@@ -3,7 +3,7 @@ import {
   removeAllChildren,
   getFullSlugFromUrl,
   simplifySlug,
-  resolvePath,
+  resolveBasePath,
 } from "@quartz-community/utils";
 
 (function () {
@@ -476,7 +476,7 @@ import {
           renderPixiFromD3();
 
           if (Date.now() - dragStartTime < 500) {
-            var target = resolvePath(event.subject.id);
+            var target = resolveBasePath(event.subject.id);
             window.location.href = target;
           }
         };
@@ -494,7 +494,7 @@ import {
         for (var i = 0; i < nodeRenderData.length; i++) {
           (function (nodeData) {
             nodeData.gfx.on("click", function () {
-              var target = resolvePath(nodeData.simulationData.id);
+              var target = resolveBasePath(nodeData.simulationData.id);
               window.location.href = target;
             });
           })(nodeRenderData[i]);
