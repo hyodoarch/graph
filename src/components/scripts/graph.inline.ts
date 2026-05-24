@@ -19,9 +19,12 @@ import {
   }
 
   function loadScript(src) {
+    var existing = document.querySelector('script[src="' + src + '"]');
+    if (existing) return Promise.resolve();
     return new Promise(function (resolve, reject) {
       var script = document.createElement("script");
       script.src = src;
+      script.crossOrigin = "anonymous";
       script.onload = resolve;
       script.onerror = reject;
       document.head.appendChild(script);
