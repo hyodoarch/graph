@@ -419,6 +419,9 @@ import {
           },
           resolution: window.devicePixelRatio * 4,
         });
+        
+        label.eventMode = "none";
+
         label.anchor.set(0.5, 1.2);
         label.alpha = 0;
         label.scale.set(1 / scale);
@@ -430,7 +433,11 @@ import {
         if (isTagNode) {
           gfx.stroke({ width: 2, color: tertiary });
         }
-
+        gfx.hitArea = new PIXI.Circle(
+         0,
+         0,
+         Math.max(radius + 5, 8),
+        );
         gfx.eventMode = "static";
         gfx.cursor = "pointer";
         gfx.label = nodeId;
@@ -723,7 +730,7 @@ import {
       cleanupLocal();
       var thisGeneration = ++currentRenderGeneration;
       var slug = getSlugFromUrl();
-      addToVisited(slug);
+      addToVisited(normalizeSlug(slug));
 
       var localContainers = document.querySelectorAll(".graph-container");
       for (var i = 0; i < localContainers.length; i++) {
