@@ -10,6 +10,13 @@ import {
 (function () {
   function getSlugFromUrl() {
     var slug = getFullSlugFromUrl();
+
+    try {
+      slug = decodeURIComponent(slug);
+  } catch {
+    // 不正なURL文字列の場合は、そのまま使用する
+  }
+
     var base = getBasePath();
     if (base && slug.startsWith(base.replace(/^\//, ""))) {
       slug = slug.slice(base.replace(/^\//, "").length);
@@ -398,7 +405,7 @@ import {
           style: {
             fontSize: fontSize * 15,
             fill: dark,
-            fontFamily: bodyFont,
+            fontFamily: '"Noto Sans JP", "Yu Gothic", sans-serif',
           },
           resolution: window.devicePixelRatio * 4,
         });
