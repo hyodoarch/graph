@@ -417,7 +417,10 @@ import {
             fill: dark,
             fontFamily: '"Noto Sans JP", "Yu Gothic", sans-serif',
           },
-          resolution: window.devicePixelRatio * 4,
+          resolution: Math.min(
+            (window.devicePixelRatio || 1) * 2,
+            4,
+          ),
         });
         
         label.eventMode = "none";
@@ -732,19 +735,42 @@ import {
       var slug = getSlugFromUrl();
       addToVisited(normalizeSlug(slug));
 
-      var localContainers = document.querySelectorAll(".graph-container");
-      for (var i = 0; i < localContainers.length; i++) {
-        (function (container) {
-          renderGraph(container, slug, thisGeneration)
-            .then(function (cleanup) {
-              if (thisGeneration === currentRenderGeneration) {
-                localCleanups.push(cleanup);
-              }
-            })
-            .catch(function (err) {
-              console.error("[Graph] Local render error:", err);
+      var localContainers =
+        document.querySelectorAll(".graph-container");
+
+      function renderWhenReady(container, retryCount) {
+        if (thisGeneration !== currentRenderGeneration) {
+          return;
+        }
+
+        // desktop-onlyなど、現在非表示のGraphは描画しない
+        if (container.offsetParent === null) {
+          return;
+        }
+
+        // モバイルレイアウトの幅が確定するまで待つ
+        if (container.offsetWidth <= 0) {
+          if (retryCount < 10) {
+            requestAnimationFrame(function () {
+              renderWhenReady(container, retryCount + 1);
             });
-        })(localContainers[i]);
+          }
+          return;
+        }
+
+        renderGraph(container, slug, thisGeneration)
+          .then(function (cleanup) {
+            if (thisGeneration === currentRenderGeneration) {
+              localCleanups.push(cleanup);
+            }
+          })
+          .catch(function (err) {
+            console.error("[Graph] Local render error:", err);
+          });
+      }
+
+      for (var i = 0; i < localContainers.length; i++) {
+        renderWhenReady(localContainers[i], 0);
       }
     }
 
