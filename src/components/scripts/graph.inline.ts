@@ -8,6 +8,16 @@ import {
 } from "@quartz-community/utils";
 
 (function () {
+  function normalizeSlug(value) {
+    try {
+      value = decodeURIComponent(value);
+    } catch {
+      // 変換できない場合はそのまま使用
+    }
+
+    return simplifySlug(value);
+  }
+  
   function getSlugFromUrl() {
     var slug = getFullSlugFromUrl();
 
@@ -94,7 +104,7 @@ import {
     }
 
     async function renderGraph(graph, fullSlug, renderGeneration) {
-      var slug = simplifySlug(fullSlug);
+      var slug = normalizeSlug(fullSlug);
       if (slug === "") slug = "index";
       var visited = getVisited();
       removeAllChildren(graph);
@@ -124,7 +134,7 @@ import {
         var dataRaw = await fetchData;
         data = new Map();
         for (var key in dataRaw) {
-          data.set(simplifySlug(key), dataRaw[key]);
+          data.set(normalizeSlug(key), dataRaw[key]);
         }
       } catch (err) {
         console.error("[Graph] Error loading data:", err);
@@ -141,7 +151,7 @@ import {
       data.forEach(function (details, source) {
         var outgoing = details.links || [];
         for (var i = 0; i < outgoing.length; i++) {
-          var dest = simplifySlug(outgoing[i]);
+          var dest = normalizeSlug(outgoing[i]);
           if (validLinks.has(dest)) {
             links.push({ source: source, target: dest });
           }
@@ -733,7 +743,7 @@ import {
 
     function handleNav(e) {
       var slug = e.detail ? e.detail.url : getSlugFromUrl();
-      addToVisited(simplifySlug(slug));
+      addToVisited(normalizeSlug(slug));
 
       renderLocal();
 
