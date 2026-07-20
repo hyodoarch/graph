@@ -107,12 +107,14 @@ import {
       var slug = normalizeSlug(fullSlug);
       if (slug === "") slug = "index";
       var visited = getVisited();
-      removeAllChildren(graph);
 
+      // 古い描画処理が、現在表示中のcanvasを消さないよう先に判定する
       if (renderGeneration !== undefined && renderGeneration !== currentRenderGeneration) {
         console.log("[Graph] Stale render, skipping");
         return function () {};
       }
+
+      removeAllChildren(graph);
 
       var config = JSON.parse(graph.dataset["cfg"] || "{}");
       var enableDrag = config.drag;
@@ -141,8 +143,22 @@ import {
         return function () {};
       }
 
-      var width = graph.offsetWidth;
-      var height = Math.max(graph.offsetHeight, 250);
+      // fetchData待機中に別の描画が始まった場合は中止する
+      if (
+        (renderGeneration !== undefined &&
+          renderGeneration !== currentRenderGeneration) ||
+        !graph.isConnected
+      ) {
+        return function () {};
+      }
+
+      var graphRect = graph.getBoundingClientRect();
+      var width = Math.floor(graphRect.width);
+      var height = Math.max(Math.floor(graphRect.height), 250);
+
+      if (width <= 0) {
+        return function () {};
+      }
 
       var links = [];
       var allTags = [];
@@ -254,6 +270,18 @@ import {
         autoDensity: true,
         eventMode: "static",
       });
+
+      // PixiJS初期化中にページ遷移・再描画が起きた場合は破棄する
+      if (
+        (renderGeneration !== undefined &&
+          renderGeneration !== currentRenderGeneration) ||
+        !graph.isConnected
+      ) {
+        try {
+          app.destroy(true);
+        } catch (_) {}
+        return function () {};
+      }
 
       graph.appendChild(app.canvas);
 
@@ -735,42 +763,123 @@ import {
       var slug = getSlugFromUrl();
       addToVisited(normalizeSlug(slug));
 
-      var localContainers =
-        document.querySelectorAll(".graph-container");
+      var localContainers = document.querySelectorAll(".graph-container");
 
-      function renderWhenReady(container, retryCount) {
-        if (thisGeneration !== currentRenderGeneration) {
-          return;
+      function observeAndRender(container) {
+        var started = false;
+        var disposed = false;
+        var isIntersecting = false;
+        var intersectionObserver = null;
+        var resizeObserver = null;
+        var firstFrame = 0;
+        var secondFrame = 0;
+
+        function disconnectObservers() {
+          if (intersectionObserver) intersectionObserver.disconnect();
+          if (resizeObserver) resizeObserver.disconnect();
         }
 
-        // desktop-onlyなど、現在非表示のGraphは描画しない
-        if (container.offsetParent === null) {
-          return;
+        function cancelWaiting() {
+          disposed = true;
+          disconnectObservers();
+          if (firstFrame) cancelAnimationFrame(firstFrame);
+          if (secondFrame) cancelAnimationFrame(secondFrame);
         }
 
-        // モバイルレイアウトの幅が確定するまで待つ
-        if (container.offsetWidth <= 0) {
-          if (retryCount < 10) {
-            requestAnimationFrame(function () {
-              renderWhenReady(container, retryCount + 1);
-            });
+        // ページ遷移時に、待機中のObserverも確実に解除する
+        localCleanups.push(cancelWaiting);
+
+        function beginRender() {
+          if (
+            started ||
+            disposed ||
+            !isIntersecting ||
+            thisGeneration !== currentRenderGeneration
+          ) {
+            return;
           }
-          return;
+
+          var rect = container.getBoundingClientRect();
+          if (rect.width <= 0) return;
+
+          started = true;
+          disconnectObservers();
+
+          // モバイル用レイアウトと幅が確定してから描画する
+          firstFrame = requestAnimationFrame(function () {
+            secondFrame = requestAnimationFrame(function () {
+              if (
+                disposed ||
+                thisGeneration !== currentRenderGeneration ||
+                !container.isConnected
+              ) {
+                return;
+              }
+
+              var finalRect = container.getBoundingClientRect();
+              if (finalRect.width <= 0) {
+                started = false;
+                setupObservers();
+                return;
+              }
+
+              renderGraph(container, slug, thisGeneration)
+                .then(function (cleanup) {
+                  if (
+                    !disposed &&
+                    thisGeneration === currentRenderGeneration
+                  ) {
+                    localCleanups.push(cleanup);
+                  } else {
+                    // 古い描画を放置せず、WebGL・animationを破棄する
+                    cleanup();
+                  }
+                })
+                .catch(function (err) {
+                  console.error("[Graph] Local render error:", err);
+                });
+            });
+          });
         }
 
-        renderGraph(container, slug, thisGeneration)
-          .then(function (cleanup) {
-            if (thisGeneration === currentRenderGeneration) {
-              localCleanups.push(cleanup);
-            }
-          })
-          .catch(function (err) {
-            console.error("[Graph] Local render error:", err);
-          });
+        function setupObservers() {
+          if (disposed || thisGeneration !== currentRenderGeneration) return;
+
+          if ("IntersectionObserver" in window) {
+            intersectionObserver = new IntersectionObserver(
+              function (entries) {
+                for (var i = 0; i < entries.length; i++) {
+                  if (entries[i].target === container) {
+                    isIntersecting = entries[i].isIntersecting;
+                    if (isIntersecting) beginRender();
+                    break;
+                  }
+                }
+              },
+              { root: null, rootMargin: "200px 0px", threshold: 0 },
+            );
+            intersectionObserver.observe(container);
+          } else {
+            isIntersecting = true;
+          }
+
+          if ("ResizeObserver" in window) {
+            resizeObserver = new ResizeObserver(function () {
+              beginRender();
+            });
+            resizeObserver.observe(container);
+          }
+
+          if (!("IntersectionObserver" in window)) {
+            beginRender();
+          }
+        }
+
+        setupObservers();
       }
 
       for (var i = 0; i < localContainers.length; i++) {
-        renderWhenReady(localContainers[i], 0);
+        observeAndRender(localContainers[i]);
       }
     }
 
